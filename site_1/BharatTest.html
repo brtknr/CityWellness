@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Merged LSOA Table - Google Fusion Tables</title>
+<style type="text/css">
+html, body, #googft-mapCanvas {
+  height: 500px;
+  margin: 0;
+  padding: 0;
+  width: 1000px;
+}
+</style>
+
+<script type="text/javascript" src="http://maps.google.com/maps/api/js?sensor=false"></script>
+
+<script type="text/javascript">
+    var tableID = "14QYidaOxA8FV72zwOq5Vq5q1TqyIOpFV4UfivKE";
+    var columnID = "geometry";
+    var indicators=new Array("ambulance","greenspace","bluespace","unemployment","detached","semidetached","terraced","maisonette");
+    //
+//  ambulance green_space blue_space unemployment ht_detached ht_semidetached ht_terraced ht_maisonette    
+    
+  function initialize() {
+
+    google.maps.visualRefresh = true;
+    var map = new google.maps.Map(document.getElementById('googft-mapCanvas'), {
+      center: new google.maps.LatLng(51.52104977983641, -0.1300412360840255),
+      zoom: 9,
+      mapTypeId: google.maps.MapTypeId.ROADMAP
+    });
+    map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(document.getElementById('googft-legend'));
+
+      condition = getCondition();
+
+    layer = new google.maps.FusionTablesLayer({
+      map: map,
+      query: {
+        select: columnID,
+        from: tableID,
+        where: condition,
+      },
+    }); 
+
+for (i = 0; i < indicators.length; i++) {
+    google.maps.event.addDomListener(document.getElementById(indicators[i]),
+        'change', function() {
+            updateMap(layer);
+        });
+}
+
+google.maps.event.addDomListener(document.getElementById("relevant"),
+    'change', function() {
+        updateMap(layer);
+    });                      
+
+    google.maps.event.addListener(layer, 'click', function(e) {
+        
+        var sliderValue = new Array();
+        var boxInfo = e.row['LSOA11NM'].value + "<br/>";
+        for (i = 0; i < indicators.length; i++) {
+            sliderValue[i] = document.getElementById(indicators[i]).value / 100;
+            boxInfo+= Math.round(e.row[indicators[i]].value/4971*sliderValue[i]*100) + "% : "+indicators[i] + "<br/>";
+        }
+
+        e.infoWindowHtml = boxInfo;
+    });  
+        
+
+  }
+  
+  function updateMap(layer) {
+      condition = getCondition();
+//      alert(condition);
+      layer.setOptions({
+        query: {
+          select: columnID,
+          from: tableID,
+          where: condition
+        }
+      });
+  }
+
+  function getCondition() {
+      var total = 0;
+      
+      var relevant = 1-document.getElementById("relevant").value / 100;
+
+      var sliderValue = new Array();
+      for (i = 0; i < indicators.length; i++) {
+          sliderValue[i] = document.getElementById(indicators[i]).value / 100;
+          total += sliderValue[i];
+      }
+      
+      var max = 100;
+
+      var condition = "";
+      
+      var weightedSliderValue = new Array();
+      var maxOf = new Array();          
+
+      for (i = 0; i < indicators.length; i++) {
+          weightedSliderValue[i] = sliderValue[i] / total;
+          
+          maxOf[i] = max * weightedSliderValue[i] * relevant;
+          
+          if (condition!=""){
+              condition = condition + " AND ";
+          }
+
+          condition = condition + indicators[i] + " > " + maxOf[i];
+      }
+
+      return condition;
+  }
+
+  google.maps.event.addDomListener(window, 'load', initialize); 
+</script>
+
+</head>
+
+<body>
+  <div id="googft-mapCanvas"></div>
+  <form name="valform" action="demo_form.asp" method="get">
+  Less <---> More Important</br>
+  <input type="range" name="ambulance" id ="ambulance" min="1" max="100" value="100">High Ambulance Callouts<br/>
+  <input type="range" name="greenspace" id ="greenspace" min="1" max="100" value="100">Green Space Nearby<br/>
+  <input type="range" name="bluespace" id="bluespace" min="1" max="100" value="100">Blue Space Nearby<br/>
+  <input type="range" name="unemployment" id="unemployment" min="1" max="100" value="100">High Unemployment Rate<br/>
+  <input type="range" name="detached" id="detached" min="1" max="100" value="100">Detached Housing<br/>  
+  <input type="range" name="semidetached" id="semidetached" min="1" max="100" value="100">Semi-detached Housing<br/>  
+  <input type="range" name="terraced" id="terraced" min="1" max="100" value="100">Terraced Houses<br/>  
+  <input type="range" name="maisonette" id="maisonette" min="1" max="100" value="100">Maisonettes<br/>   
+  <input type="range" name="relevant" id="relevant" min="1" max="99" value="99">Results<br/>        
+  </form>  
+</body>
+</html>

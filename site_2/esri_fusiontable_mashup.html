@@ -1,0 +1,366 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+    <title></title>
+    <link rel="stylesheet" href="http://js.arcgis.com/3.7/js/esri/css/esri.css">
+	 <link rel="stylesheet" href="http://js.arcgis.com/3.7/js/dojo/dijit/themes/tundra/tundra.css">
+   
+    <link rel="stylesheet" href="css/styles.css">
+    <script>var dojoConfig = { 
+      packages: [{
+        name: "extras",
+        location: location.pathname.replace(/\/[^/]+$/, "") + "/extras"
+      }],
+	  isDebug:true
+    };
+    </script>
+    <script src="http://js.arcgis.com/3.7/"></script>
+    <script>
+      require([
+        "dojo/parser", 
+        "dojo/json", 
+        "dojo/_base/array", 
+        "dojo/_base/connect", 
+        "dojo/_base/Color", 
+        "dojo/number", 
+        "dojo/dom-construct",
+        
+        "esri/map", 
+        "esri/geometry/Extent",
+        "esri/symbols/SimpleLineSymbol",
+        "esri/symbols/SimpleFillSymbol",
+        "esri/renderers/SimpleRenderer",
+        "esri/renderers/ClassBreaksRenderer",
+
+        "esri/layers/FeatureLayer", 
+		"esri/InfoTemplate",
+        "esri/dijit/Legend", 
+        "esri/request",
+        "extras/Tip", 
+        "dijit/form/HorizontalSlider",
+        
+        "dijit/layout/BorderContainer", 
+        "dijit/layout/ContentPane", 
+		 "dojo/domReady!"
+      ], function(
+        parser, JSON, arr, conn, Color, number, domConstruct, 
+        Map, Extent, SimpleLineSymbol, SimpleFillSymbol, SimpleRenderer, ClassBreaksRenderer, 
+        FeatureLayer, InfoTemplate,Legend, esriRequest, Tip) {
+          // call the parser to create the dijit layout dijits
+          parser.parse();
+
+          var bounds = new Extent({"xmin":-62000,"ymin":6650000,"xmax":50400,"ymax":6754000,"spatialReference":{"wkid":102100}});
+          window.map = new Map("map", { 
+            extent: bounds,
+			basemap: "topo",
+      //      lods: [{"level":0, "resolution": 3966, "scale": 15000000}],
+            slider: true
+          });
+		 //var infoTemplate = new InfoTemplate("${state_name}", "Population (2000):  ${pop2000:NumberFormat}");
+		 var popupTemplate = new esri.dijit.PopupTemplate({
+          title: "LSOA Area {LSOA11CD}",
+          fieldInfos: [
+            { fieldName: "DISPLAYVALUE", visible: true, label: "Score based on current weights: " }
+          ]
+        });
+		var content = "<b>Name</b>: ${LSOA11NM} (${LSOA11CD})" + "<br /><b>Score based on current preferences</b>: ${DISPLAYVALUE:NumberFormat(places:2)}";
+        var infoTemplate = new InfoTemplate("Wellbeing score", content);
+          window.fl = new FeatureLayer(
+			//"http://sampleserver6.arcgisonline.com/arcgis/rest/services/Census/MapServer/3", 
+			"http://services2.arcgis.com/JJqVjRK9DU8PITfx/arcgis/rest/services/LSOA_2011_London/FeatureServer/0",
+			{
+            maxAllowableOffset: window.map.extent.getWidth() / window.map.width / 4,
+            mode: FeatureLayer.MODE_SNAPSHOT,
+            outFields: ["*"],
+			infoTemplate:infoTemplate,
+            visible: true
+          });
+          // override default renderer so that polygons aren't drawn
+          // until the current attribute data has been loaded and is joined
+          fl.setRenderer(new SimpleRenderer(null));
+
+          var template = "<strong>${ATTR 1 SCORE}:  $${DISPLAYVALUE}</strong>";
+          window.tip = new Tip({
+            "format": template,
+            "node": "legend"
+          });
+
+          var updateEnd = fl.on("update-end", function() {
+            updateEnd.remove();
+        //  	url:"https://www.googleapis.com/fusiontables/v1/query?sql=select%20*%20from%201gi-pCyJA5TSez0h2RpQrFw0L3mfgkMHrnS0gkPo&key=AIzaSyDx6wTBOmr7EWQ7OofCSXbSSFYIqW-MYJk",
+				
+			var attribdata = esriRequest({
+			
+				url:"https://www.googleapis.com/fusiontables/v1/query?sql=select%20*%20from%201AgMb8ObrTanqLzM9EgngzfCZSfGc7z_dJlLLZZw&key=AIzaSyDx6wTBOmr7EWQ7OofCSXbSSFYIqW-MYJk",
+				callbackParamName:"callback"
+			});
+			attribdata.then(parseAttribs, pricesError);
+            // wire up the tip
+            fl.on("mouse-over", window.tip.showInfo);
+            fl.on("mouse-out", window.tip.hideInfo);
+          });
+          window.map.addLayer(fl);
+		   window.slider1 = dijit.byId('slider1');
+		   window.slider2 = dijit.byId('slider2');
+		   window.slider3 = dijit.byId('slider3');
+		   window.slider4 = dijit.byId('slider4');
+		   //window.slider5 = dijit.byId('slider5');
+		   
+        dojo.connect(window.slider1, 'onChange', function(evt) {
+			updateScores();
+			});
+			dojo.connect(window.slider2, 'onChange', function(evt) {
+			updateScores();
+			});
+			dojo.connect(window.slider3, 'onChange', function(evt) {
+			updateScores();
+			});
+			dojo.connect(window.slider4, 'onChange', function(evt) {
+			updateScores();
+			});
+			
+        //  dojo.forEach(globals.currentFl.graphics, function(g) {
+         //   if ( g.attributes.POP2000 > evt ) {
+          //    g.hide();
+           // } else {
+            //  g.show();
+            //}
+          //});
+        
+		  
+function parseAttribs(data){
+	console.log("received FT data");
+	//var fusionData = JSON.parse(data);
+	var datarows = data.rows;
+	var keyIndex = data.columns.indexOf("LSOA11CD");
+	"Happy Score",
+  "Sad Score",
+  "Young Prof Score",
+  "Family Score"
+	var attr1Index = data.columns.indexOf("Happy Score");
+	var attr2Index = data.columns.indexOf("Sad Score");
+	var attr3Index = data.columns.indexOf("Young Prof Score");
+	var attr4Index = data.columns.indexOf("Family Score"); // NB different
+	//var attr5Index = data.columns.indexOf("att5");
+	window.attr1Data = {};
+	window.attr2Data = {};
+	window.attr3Data = {};
+	window.attr4Data = {};
+	//window.attr5Data = {};
+	window.a1Min = Infinity, a1Max = -Infinity;
+	window.a2Min = Infinity, a2Max = -Infinity;
+	window.a3Min = Infinity, a3Max = -Infinity;
+	window.a4Min = Infinity, a4Max = -Infinity;
+	//window.a5Min = Infinity, a5Max = -Infinity;
+	window.numParsed=0;
+	arr.forEach(datarows,function(g){
+		if (g[keyIndex]){
+			var val = parseFloat(g[attr1Index]);
+			attr1Data[g[keyIndex]] = {raw:val};
+			if (val<a1Min){a1Min=val}
+			if(val>a1Max){a1Max=val}
+			
+			var val = parseFloat(g[attr2Index]);
+			attr2Data[g[keyIndex]] = {raw:val};
+			if (val<a2Min){a2Min=val}
+			if(val>a2Max){a2Max=val}
+			var val = parseFloat(g[attr3Index]);
+			attr3Data[g[keyIndex]] = {raw:val};
+			if (val<a3Min){a3Min=val}
+			if(val>a3Max){a3Max=val}
+			var val = parseFloat(g[attr4Index]);
+			attr4Data[g[keyIndex]] = {raw:val};
+			if (val<a4Min){a4Min=val}
+			if(val>a4Max){a4Max=val}
+			//var val = parseFloat(g[attr5Index]);
+			//attr5Data[g[keyIndex]] = {raw:val};
+			//if (val<a5Min){a5Min=val}
+			//if(val>a5Max){a5Max=val}
+			//numParsed +=1;
+		}
+		else {
+			console.log("no key in "+g);
+		}
+	});
+	window.numGraphicsUpdated=0;
+	calcWeightScores();
+	//arr.forEach(fl.graphics, function(g) {
+     //         if (g.attributes.LSOA11CD){
+	//		  var displayValue = attr1Data[g.attributes.LSOA11CD].raw.toFixed(2);
+     //         g.attributes.DISPLAYVALUE = displayValue;
+	//		  numGraphicsUpdated+=1;
+	//		  }
+	//	  else {
+		//		console.log("no key in graphic "+g);
+	//		  }
+     //      });
+			// create a class breaks renderer
+           // var breaks = calcBreaks(a1Min, a1Max, 4);
+		   var breaks=[0,0.25,0.5,0.75];
+            // console.log("gas price breaks: ", breaks);
+            var sfs = SimpleFillSymbol;
+            var sls = SimpleLineSymbol;
+			var defaultSymbol= new SimpleFillSymbol();
+			defaultSymbol.setColor(new Color([150, 150, 150, 0.5]));
+            var outline = sls("solid", new Color("#444"), 1);
+            var br = new ClassBreaksRenderer(defaultSymbol, findRendererValue);
+            br.setMaxInclusive(true);
+            br.addBreak(breaks[0], breaks[1], new sfs("solid", outline, new Color([255, 255, 178, 0.75])));
+            br.addBreak(breaks[1], breaks[2], new sfs("solid", outline, new Color([254, 204, 92, 0.75])));
+            br.addBreak(breaks[2], breaks[3], new sfs("solid", outline, new Color([253, 141, 60, 0.75])));
+            br.addBreak(breaks[3], 1, new sfs("solid", outline, new Color([227, 26, 28, 0.75])));
+
+            fl.setRenderer(br);
+            fl.redraw();
+
+            var legend = new Legend({
+              map: window.map,
+              layerInfos: [{ "layer": fl, "title": "Score based on current weights" }]
+            },"legend");
+            legend.startup();
+
+            // remove the loading div
+            domConstruct.destroy("loading");
+          
+}
+function updateScores(){
+	//todo add timeout
+	calcWeightScores();
+}
+ function calcWeightScores(){
+ // call this on initial load and then on each subsequent slider change
+ // hardcode slider values for now as the sliders don't exist yet
+	//var slider1 = 0.2, slider2 = 0.4, slider3 = 0.1, slider4 = 0.9, slider5 = 0.7;
+	//attr1Weights = [];
+	for (x in attr1Data){
+		attr1Data[x].weighted =attr1Data[x].raw * window.slider1.value;//slider1;
+	}
+	for (x in attr2Data){
+		attr2Data[x].weighted =attr2Data[x].raw * window.slider2.value;//slider2;
+	}
+	for (x in attr3Data){
+		attr3Data[x].weighted = attr3Data[x].raw * window.slider3.value;//slider3;
+	}
+	for (x in attr4Data){
+		attr4Data[x].weighted = attr4Data[x].raw * window.slider4.value;//slider4;
+	}
+	//for (x in attr5Data){
+	//	attr5Data[x].weighted = attr5Data[x].raw * window.slider5.value;//slider5;
+	//}
+	console.log("Weights: "+window.slider1.value+", "+window.slider2.value+", "+window.slider3.value+", "+window.slider4.value);//+", "+window.slider5.value);
+	// for each graphic add weighted on each attr to get overall weighted val
+	// track max overall
+	window.maxTotalWeight = -Infinity;
+	arr.forEach(fl.graphics, function(g) {
+              if (g.attributes.LSOA11CD){
+				var key = g.attributes.LSOA11CD;
+				var totalWeighted = 
+					(attr1Data[key]? parseFloat(attr1Data[key]["weighted"]) : 0)
+					+	(attr2Data[key]? parseFloat(attr2Data[key]["weighted"]) : 0)
+					+	(attr3Data[key]? parseFloat(attr3Data[key]["weighted"]) : 0)
+					+	(attr4Data[key]? parseFloat(attr4Data[key]["weighted"]) : 0)
+				//	+	(attr5Data[key]? parseFloat(attr5Data[key]["weighted"]) : 0);
+				if (totalWeighted > maxTotalWeight){maxTotalWeight = totalWeighted};
+				g.attributes.TOTALWEIGHT = totalWeighted;
+				}
+	        });
+	arr.forEach(fl.graphics,function(g){
+		g.attributes.DISPLAYVALUE = g.attributes.TOTALWEIGHT / window.maxTotalWeight;
+		// normalise overall weighted val to max overall val and symbolise that
+	});
+	fl.redraw();
+ }
+                 
+          // function used by the class breaks renderer to get the
+          // value used to symbolize each state
+          function findRendererValue(graphic) {
+           // var featid = graphic.attributes.LSOA11CD;
+           // return attr1Data[featid].raw;
+		   return graphic.attributes.DISPLAYVALUE;
+          }
+
+          function calcBreaks(min, max, numberOfClasses) {
+            var range = (max - min) / numberOfClasses;
+            var breakValues = [];
+            for ( var i = 0; i < numberOfClasses; i++ ) {
+              breakValues[i] = formatDollars(min + ( range * i ));
+            }
+            // console.log("break values: ", breakValues);
+            return breakValues;
+          }
+
+          function formatDollars(num) {
+            return number.format(num, { "places": 2 });
+          }
+          
+          function pricesError(e) {
+            console.log("error getting gas price data: ", e);
+          }
+        }
+      );
+    </script>
+  </head>
+  
+  <body class="tundra">
+
+    <div id="loading" class="shadow loading">
+      Loading Latest Wellbeing Data...
+      <img src="http://dl.dropbox.com/u/2654618/loading_gray_circle.gif">
+    </div>
+
+    <div id="legend" class="shadow info"></div>
+
+    <div data-dojo-type="dijit.layout.BorderContainer" 
+         data-dojo-props="design:'headline',gutters:false" 
+         style="width: 100%; height: 100%; margin: 0;">
+      <div id="left" data-dojo-type="dijit.layout.ContentPane" data-dojo-props="region:'left'">
+	  <div id="sliders">
+          <div>
+            Weight to Happiness:
+          </div>
+          <div id="slider1" 
+            data-dojo-type="dijit.form.HorizontalSlider" 
+            data-dojo-props="showButtons:true, value:0, minimum:0, maximum:1, discreteValues:10, intermediateChanges:false"
+            style="width:200px; ">
+          </div>
+          <div>Weight to Sadness(!):
+          </div>
+          <div id="slider2" 
+            data-dojo-type="dijit.form.HorizontalSlider" 
+            data-dojo-props="showButtons:true, value:0, minimum:0, maximum:1, discreteValues:10, intermediateChanges:false"
+            style="width:200px; ">
+          </div>
+          <div>
+            Weight to Young Professionals:
+          </div>
+          <div id="slider3" 
+            data-dojo-type="dijit.form.HorizontalSlider" 
+            data-dojo-props="showButtons:true, value:0, minimum:0, maximum:1, discreteValues:10, intermediateChanges:false"
+            style="width:200px; ">
+          </div>
+          <div>
+            Weight to Families:
+          </div>
+          <div id="slider4" 
+            data-dojo-type="dijit.form.HorizontalSlider" 
+            data-dojo-props="showButtons:true, value:0, minimum:0, maximum:1, discreteValues:10, intermediateChanges:false"
+            style="width:200px; ">
+          </div>
+          
+		  
+        </div>
+
+	  </div>
+	  <div id="map" 
+           data-dojo-type="dijit.layout.ContentPane" 
+           data-dojo-props="region:'center'"> 
+        
+        <div id="title" class="shadow info">Customised Wellbeing Index</div>
+
+      </div>
+    </div>
+  </body>
+</html>
+
